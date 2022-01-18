@@ -27,16 +27,26 @@ contract Voting is Ownable{
         votedCount = 0;
         voterCount = 0;
         currentProposal = 0;
+        
+        voters.push(msg.sender);
+        votersVotedMap[msg.sender] = false;
+        voterCount++;
     }
 
     /*
         Create a new proposal if the previous has finished. 
     */
     function createProposal(bytes32 proposalUuid, string memory proposal, uint timeToVoteInMins) public onlyOwner {
-        require(isCurrentProposalFinished(), "There is still a proposal underway");
-        require(proposals[currentProposal].proposalId < 0, "The proposal id must be unique");
 
-        proposals[currentProposal] = Proposal({
+        if (currentProposal != 0) {
+            require(isCurrentProposalFinished(), "There is still a proposal underway");
+        }
+        
+        require(proposals[proposalUuid].proposalId == 0, "The proposal id must be unique");
+
+        currentProposal = proposalUuid;
+
+        proposals[proposalUuid] = Proposal({
             proposalId: proposalUuid,
             votesFor: 0,
             vetoVotes: 0,
@@ -105,8 +115,21 @@ contract Voting is Ownable{
         return proposals[currentProposal].votesFor;
     }
 
+    function getCurrentProposal() external view returns(bytes32) {
+        return proposals[currentProposal].proposalId;
+    }
+
     function currentVetosFor() external view returns(uint) {
         return proposals[currentProposal].vetoVotes;
+    }
+
+
+    function didVoterVoteOnCurrentProposal(address user) external view returns(bool) {
+        return votersVotedMap[user];
+    }
+
+    function getVoters() external view returns(address[] memory) {
+        return voters;
     }
 
     function didProposalPass(bytes32 proposalName) external view returns(bool) {
