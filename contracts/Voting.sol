@@ -11,7 +11,7 @@ contract Voting is Ownable{
     uint public timeToVote = 1 minutes;
 
     address [] public voters;
-    mapping(address => bool) public votersVotedMap; // Map of all users allowed to vote and whether or not they voted
+    mapping(address => Voter) public votersVotedMap; // Map of all users allowed to vote and whether or not they voted
     mapping(bytes32 => Proposal) public proposals;
 
     struct Proposal {
@@ -23,13 +23,19 @@ contract Voting is Ownable{
         bool isFinished; 
     }
 
+    struct Voter {
+        bool valid;
+        bool voted;
+    }
+
     constructor() {
         votedCount = 0;
         voterCount = 0;
         currentProposal = 0;
-        
+    
         voters.push(msg.sender);
-        votersVotedMap[msg.sender] = false;
+        votersVotedMap[msg.sender].valid = true;
+        votersVotedMap[msg.sender].voted = false;
         voterCount++;
     }
 
@@ -39,7 +45,7 @@ contract Voting is Ownable{
     function createProposal(bytes32 proposalUuid, string memory proposal, uint timeToVoteInMins) public onlyOwner {
 
         if (currentProposal != 0) {
-            require(isCurrentProposalFinished(), "There is still a proposal underway");
+            require(proposalClosed() == true, "There is still a proposal underway");
         }
         
         require(proposals[proposalUuid].proposalId == 0, "The proposal id must be unique");
@@ -69,14 +75,16 @@ contract Voting is Ownable{
         Give a user voting privledges
     */
     function addVoter(address voter) public onlyOwner {
+        require(!votersVotedMap[voter].valid, "User cannot be a voter twice");
         voters.push(voter);
-        votersVotedMap[voter] = false;
+        votersVotedMap[voter].valid = true;
+        votersVotedMap[voter].voted = false;
         voterCount++;
     }
 
     function vote(bool voteToPassProposal) public {
-        require(votersVotedMap[msg.sender] == false, "User has already voted on this proposal");
-        require(!isCurrentProposalFinished(), "There currently isn't anything to vote on");
+        require(votersVotedMap[msg.sender].voted == false, "User has already voted on this proposal");
+        require(proposalClosed() == false, "There currently isn't anything to vote on");
 
         if (voteToPassProposal) {
             proposals[currentProposal].votesFor++;
@@ -85,16 +93,17 @@ contract Voting is Ownable{
         }
 
         votedCount++;
-        votersVotedMap[msg.sender] = true;
+        votersVotedMap[msg.sender].voted = true;
     }
     
     /*
         Checks if the current proposal has ended.
         If it has then we reset voted count as well as the votedMapping
     */
-    function isCurrentProposalFinished() public returns(bool) {
+    function proposalClosed() public returns(bool) {
         // check if all voters have voted and that the proposal hasn't expired
-        if (votedCount != voterCount && (proposals[currentProposal].proposedTimestamp  + timeToVote) < block.timestamp) {
+        // if not then proposal = notClosed
+        if (votedCount != voterCount && (proposals[currentProposal].proposedTimestamp  + timeToVote) >= block.timestamp) {
             return false;
         } else if (!proposals[currentProposal].isFinished) {
             proposals[currentProposal].isFinished = true;
@@ -102,7 +111,7 @@ contract Voting is Ownable{
 
             // reset all voter to vote map to false
             for (uint i=0; i< voterCount ; i++){
-                votersVotedMap[voters[i]] = false;
+                votersVotedMap[voters[i]].voted = false;
             }     
 
             return true;       
@@ -119,13 +128,16 @@ contract Voting is Ownable{
         return proposals[currentProposal].proposalId;
     }
 
+    function getProposalExpirationTime() external view returns(uint) {
+        return proposals[currentProposal].proposedTimestamp  + timeToVote;
+    }
+
     function currentVetosFor() external view returns(uint) {
         return proposals[currentProposal].vetoVotes;
     }
 
-
     function didVoterVoteOnCurrentProposal(address user) external view returns(bool) {
-        return votersVotedMap[user];
+        return votersVotedMap[user].voted;
     }
 
     function getVoters() external view returns(address[] memory) {
