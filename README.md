@@ -1,6 +1,6 @@
-# Basic Sample Hardhat Project
+# Voting on chain
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, a sample script that deploys that contract, and an example of a task implementation, which simply lists the available accounts.
+A contract that allows the owner to create proposals. The proposal is completed when the time to vote expires or all voters have finished voting. A second proposal cannot be created while a proposal is underway. This was a good project for learning some deeper solidity concepts
 
 Try running some of the following tasks:
 
